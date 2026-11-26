@@ -1,0 +1,200 @@
+{
+  "std_ddof": 1,
+  "single_observation_std": null,
+  "overall_unit": "subject mean after averaging the completed seeds for that subject",
+  "per_subject_across_seeds": {
+    "A01": {
+      "accuracy": {
+        "mean": 0.3611111111111111,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.14814814814814814,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.35771115409413284,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A02": {
+      "accuracy": {
+        "mean": 0.28125,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.04166666666666663,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.24435386637439993,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A03": {
+      "accuracy": {
+        "mean": 0.4965277777777778,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.3287037037037037,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.48711948146523276,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A04": {
+      "accuracy": {
+        "mean": 0.3784722222222222,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.17129629629629628,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.3285929138866644,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A05": {
+      "accuracy": {
+        "mean": 0.2604166666666667,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.01388888888888884,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.21517587085811385,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A06": {
+      "accuracy": {
+        "mean": 0.2916666666666667,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.05555555555555558,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.1974261374740171,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A07": {
+      "accuracy": {
+        "mean": 0.3854166666666667,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.18055555555555558,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.3152154743279761,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A08": {
+      "accuracy": {
+        "mean": 0.3819444444444444,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.17592592592592593,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.3784687762628939,
+        "std": null,
+        "count": 1
+      }
+    },
+    "A09": {
+      "accuracy": {
+        "mean": 0.5243055555555556,
+        "std": null,
+        "count": 1
+      },
+      "kappa": {
+        "mean": 0.3657407407407407,
+        "std": null,
+        "count": 1
+      },
+      "macro_f1": {
+        "mean": 0.498050638982108,
+        "std": null,
+        "count": 1
+      }
+    }
+  },
+  "per_seed_across_subjects": {
+    "42": {
+      "accuracy": {
+        "mean": 0.37345679012345684,
+        "std": 0.09101116226725127,
+        "count": 9
+      },
+      "kappa": {
+        "mean": 0.1646090534979424,
+        "std": 0.12134821635633501,
+        "count": 9
+      },
+      "macro_f1": {
+        "mean": 0.3357904793028377,
+        "std": 0.10843151303402433,
+        "count": 9
+      }
+    }
+  },
+  "overall_across_subject_means": {
+    "accuracy": {
+      "mean": 0.37345679012345684,
+      "std": 0.09101116226725127,
+      "count": 9
+    },
+    "kappa": {
+      "mean": 0.1646090534979424,
+      "std": 0.12134821635633501,
+      "count": 9
+    },
+    "macro_f1": {
+      "mean": 0.3357904793028377,
+      "std": 0.10843151303402433,
+      "count": 9
+    }
+  },
+  "n_completed_runs": 9,
+  "expected_runs_in_this_invocation": 9,
+  "completed_runs_in_this_invocation": 9,
+  "complete": true
+}

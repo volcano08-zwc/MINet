@@ -1,0 +1,105 @@
+# First implementation. Values marked provisional remain open to revision.
+paths:
+  data_dir: "/home/jqsj/hzy/zwc/data/bci_2a/2a"
+  labels_dir: "/home/jqsj/hzy/zwc/data/bci_2a/2a_label"
+  output_dir: "output"
+
+data:
+  sampling_rate: 250
+  n_channels: 22
+  channel_names: [Fz, FC3, FC1, FCz, FC2, FC4, C5, C3, C1, Cz, C2, C4, C6, CP3, CP1, CPz, CP2, CP4, P1, Pz, P2, POz]
+  epoch_start_sec: 0.5
+  epoch_end_sec: 4.5
+  notch_frequency_hz: 50.0
+  notch_quality: 30.0
+  unit_scale: 1000000.0 # Convert GDF volts to microvolts before training statistics.
+  drop_artifacts: false
+  invalid_epoch_policy: error
+  channel_aliases: {}
+
+normalization:
+  mode: train_session_stats # Provisional baseline, fitted on training trials only.
+  eps: 0.000001
+
+validation:
+  val_ratio: 0.2 # Provisional.
+
+training:
+  learning_rate: 0.0003
+  batch_size: 32
+  max_epochs: 200
+  weight_decay: 0.0001
+  patience: 30
+  seeds: [42]
+  subjects: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  device: cuda
+  num_workers: 0
+
+model:
+  d_model: 64
+  num_classes: 4
+  dropout: 0.3
+  sinc:
+    num_bands: 5
+    initial_edges_hz: [4, 8, 13, 20, 30, 40]
+    learnable_cutoffs: true
+    boundary_parameterization: shared_softmax_gaps
+    min_freq_hz: 0.5
+    max_freq_hz: 124.0
+    min_bandwidth_hz: 1.0
+    kernel_size: 251 # Provisional.
+    window_function: hamming # Provisional.
+    padding_mode: reflect # Provisional boundary extension when context is insufficient.
+    context_samples: 0 # Provisional; per side, giving T_context = 1000 + 2 * context_samples.
+    share_across_electrodes: true
+  power:
+    window_size: 250
+    stride: 50
+    eps: 0.000001
+  psca:
+    dct_orders: [1, 2, 3]
+    dct_group_mapping: interleaved
+    custom_channel_orders: null
+    include_dc: false
+    hidden_dims: [27] # Provisional weight subnetwork because the original figure was not supplied.
+    activation: relu # Provisional.
+    output_activation: sigmoid # Provisional.
+    bias: true
+  temporal_transformer:
+    max_len: 128
+    layers: 2
+    heads: 4
+    dim_feedforward: 128
+    activation: gelu
+  spatial:
+    encoder_channels: [32, 64]
+    encoder_kernel_sizes: [25, 15]
+    encoder_strides: [5, 2]
+    encoder_paddings: [12, 7]
+    coordinate_source: standard_1005
+    coordinates_m: null # Optional explicit [22, 3] coordinates in channel_names order.
+    knn_k: 4 # Provisional.
+    gat_layers: 2 # Provisional.
+    gat_heads: 4 # Provisional; 16 output features per head at d_model=64.
+    gat_residual: true
+    gat_normalization: layernorm
+    gat_negative_slope: 0.2
+    gat_attention_dropout: 0.3
+    n_regions: 3
+    region_anchor_names: [C3, Cz, C4] # Provisional anchors.
+    region_sigma_m: [0.06, 0.06, 0.06] # Provisional prior bandwidth, metres.
+    prior_strength: 1.0 # Provisional.
+    roi_eps: 0.000001
+  region_transformer:
+    layers: 2
+    heads: 4
+    dim_feedforward: 128
+    activation: gelu
+  cross_attention:
+    heads: 4 # Provisional.
+    dim_feedforward: 128
+  fusion:
+    dropout: 0.3
+  classifier:
+    hidden_dim: 64
+    dropout: 0.3
