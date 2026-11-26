@@ -3,3 +3,14 @@ __pycache__/
 .pytest_cache/
 output/
 .venv/
+
+# Local experiment artifacts.
+outputs/
+results/
+docs/results/
+runs/
+logs/
+checkpoints/
+*.pt
+*.pth
+*.ckpt

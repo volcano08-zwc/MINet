@@ -122,6 +122,8 @@ loss.backward()
 
 ## 训练、评估和结果
 
+v1 的历史实验、三个改进方案与串行运行命令记录在 [v1 实验记录](docs/v1_experiments.md)。运行 `python -u run_v1_experiments.py --gpu 0`，将在 GPU 0 上依次训练正则化、轻量化、GroupNorm 三组实验，三组均保留频移增强。
+
 当前 `train_2a.py` 默认采用 Session 1 全量训练、每轮测试 Session 2、执行全部指定 epoch，并按最高测试 Acc 保存模型。`--protocol validation` 可运行下文记录的 v1 验证集选模协议。当前增强方式、GPU 3 命令及批量设置见 [全量训练说明](FULL_SESSION1.md)。
 
 配置数据目录后，使用以下命令训练单被试、单随机种子。

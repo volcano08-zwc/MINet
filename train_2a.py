@@ -26,7 +26,7 @@ from data.bci2a import (
     resolve_directory, stratified_split,
 )
 from metrics import classification_metrics, summarize_results
-from model.bci2a import DualBranchMINet
+from model.bci2a import DualBranchMINet, V1_EXPERIMENTS, apply_v1_experiment
 from plot_results import PLOT_STYLE, _save_csv, _save_figure, save_confusion_matrices, save_learning_curves
 import matplotlib
 from matplotlib import pyplot as plt
@@ -91,7 +91,8 @@ def run_epoch(model, loader, device, optimizer=None, n_classes=4):
     model.train(training)
     total_loss = 0.0
     labels_all, predictions_all = [], []
-    loss_function = nn.CrossEntropyLoss()
+    smoothing = getattr(model, "label_smoothing", 0.0) if training else 0.0
+    loss_function = nn.CrossEntropyLoss(label_smoothing=smoothing)
     with torch.set_grad_enabled(training):
         for batch in loader:
             spatial = batch["x_spatial"].to(device)
@@ -292,9 +293,10 @@ def save_test_curves(history, directory, best_epoch, title):
     """Save the actual train/test series with explicit test labels."""
     epochs = [row["epoch"] for row in history]
     _save_csv(Path(directory) / "history.csv",
-              ["epoch", "train_accuracy", "test_accuracy", "train_loss", "test_loss", "version"],
+              ["epoch", "train_accuracy", "test_accuracy", "train_loss", "test_loss", "version", "experiment_variant"],
               [[row["epoch"], row["train"]["accuracy"], row["test"]["accuracy"],
-                row["train"]["loss"], row["test"]["loss"], row["version"]] for row in history])
+                row["train"]["loss"], row["test"]["loss"], row["version"],
+                row.get("experiment_variant", "baseline")] for row in history])
     with matplotlib.rc_context(PLOT_STYLE):
         for metric, scale, label in (("accuracy", 100, "Accuracy (%)"), ("loss", 1, "Cross-entropy loss")):
             figure, axis = plt.subplots(figsize=(7.2, 4.8))
@@ -326,6 +328,7 @@ def train_full_subject(config, subject, seed, output_root):
     seed_everything(seed)
     training = config["training"]
     version = config.get("experiment", {}).get("version", "v1")
+    variant = config.get("experiment", {}).get("variant", "baseline")
     epochs_max = int(training["max_epochs"])
     if epochs_max < 1 or int(training["batch_size"]) < 1:
         raise ValueError("Epochs and batch size must be positive.")
@@ -347,13 +350,17 @@ def train_full_subject(config, subject, seed, output_root):
         train_loader = AugmentedTrainingLoader(train_loader, augmenter)
     test_loader = make_loader(BCI2aDataset(test_epochs, normalizer=normalizer), config)
     model = DualBranchMINet(config).to(device)
+    parameter_count = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(training["learning_rate"]),
                                   weight_decay=float(training["weight_decay"]))
     directory.mkdir(parents=True, exist_ok=False)
     protocol = {"version": version, "name": "full_session1_test_accuracy_selection", "model_selection": SELECTION,
                 "test_used_for_model_selection": True, "validation_enabled": False,
                 "early_stopping_enabled": False, "normalization_fit": "full session 1 only",
-                "augmentation": augmentation}
+                "augmentation": augmentation, "experiment_variant": variant,
+                "trainable_parameters": parameter_count,
+                "training_label_smoothing": model.label_smoothing,
+                "test_label_smoothing": 0.0}
     split = {**protocol, "train_indices": indices.tolist(), "validation_indices": [],
              "train_cue_samples": training_epochs.cue_samples.tolist(), "validation_cue_samples": [],
              "session_1_total_kept": len(indices), "session_1_dropped_trials": training_epochs.dropped_trials}
@@ -363,12 +370,14 @@ def train_full_subject(config, subject, seed, output_root):
     history, best_accuracy, best_epoch = [], -1.0, 0
     best_metrics, best_labels, best_predictions = None, None, None
     n_classes = int(config["model"]["num_classes"])
-    print(f"[{version}] {subject} augmentation={augmentation} train_trials={len(indices)} "
+    print(f"[{version}/{variant}] {subject} parameters={parameter_count} "
+          f"augmentation={augmentation} train_trials={len(indices)} "
           f"train_steps_per_epoch={len(train_loader)}", flush=True)
     for epoch in range(1, epochs_max + 1):
         train_metrics, _, _ = run_epoch(model, train_loader, device, optimizer, n_classes)
         test_metrics, labels, predictions = run_epoch(model, test_loader, device, n_classes=n_classes)
-        history.append({"version": version, "epoch": epoch, "train": train_metrics, "test": test_metrics})
+        history.append({"version": version, "experiment_variant": variant,
+                        "epoch": epoch, "train": train_metrics, "test": test_metrics})
         save_json(directory / "history.json", history)
         if test_metrics["accuracy"] > best_accuracy:
             best_accuracy, best_epoch = test_metrics["accuracy"], epoch
@@ -380,7 +389,7 @@ def train_full_subject(config, subject, seed, output_root):
                 "best_epoch": best_epoch, "test_metrics": best_metrics, "split": split,
                 "protocol": protocol, "version": version,
             })
-        print(f"[{version}] {subject} seed={seed} epoch={epoch}/{epochs_max} "
+        print(f"[{version}/{variant}] {subject} seed={seed} epoch={epoch}/{epochs_max} "
               f"train_loss={train_metrics['loss']:.6f} train_acc={train_metrics['accuracy']:.4f} "
               f"test_loss={test_metrics['loss']:.6f} test_acc={test_metrics['accuracy']:.4f} "
               f"best_test_acc={best_accuracy:.4f} best_epoch={best_epoch}", flush=True)
@@ -389,8 +398,9 @@ def train_full_subject(config, subject, seed, output_root):
               "session_2_dropped_trials": test_epochs.dropped_trials}
     save_json(directory / "test_metrics.json", result)
     np.savez_compressed(directory / "test_predictions.npz", labels=best_labels,
-                        predictions=best_predictions, cue_samples=test_epochs.cue_samples, version=version)
-    title = f"{version} / {subject} / seed {seed} / {augmentation['method']} / highest test Acc"
+                        predictions=best_predictions, cue_samples=test_epochs.cue_samples,
+                        version=version, experiment_variant=variant)
+    title = f"{version} / {variant} / {subject} / seed {seed} / {augmentation['method']} / highest test Acc"
     save_test_curves(history, directory, best_epoch, title)
     save_confusion_matrices(best_metrics["confusion_matrix"], directory, title=title)
     return result
@@ -411,9 +421,10 @@ def save_version_summary(root, results, expected_runs):
         summary["test_used_for_model_selection"] = True
         summary["model_selection"] = SELECTION
         summary["augmentations"] = sorted({row.get("augmentation", {}).get("method", "none") for row in records})
+        summary["experiment_variants"] = sorted({row.get("experiment_variant", "baseline") for row in records})
         save_json(summary_path, summary)
-        columns = ["version", "augmentation", "subject", "seed", "best_epoch", "epochs_run",
-                   "accuracy", "kappa", "macro_f1", "n_trials", "loss"]
+        columns = ["version", "experiment_variant", "augmentation", "subject", "seed", "best_epoch", "epochs_run",
+                   "accuracy", "kappa", "macro_f1", "n_trials", "loss", "trainable_parameters"]
         _save_csv(Path(root) / "results.csv", columns,
                   [[row.get("augmentation", {}).get("method", "none") if column == "augmentation"
                     else row.get(column) for column in columns] for row in records])
@@ -432,13 +443,15 @@ def main():
     parser.add_argument("--protocol", choices=["full-session1", "validation"], default="full-session1")
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--run-version", default="v1")
-    parser.add_argument("--augmentation", choices=["none", "sr", "frequency_shift"], default="none")
+    parser.add_argument("--experiment", choices=V1_EXPERIMENTS, default="baseline",
+                        help="Independent v1 preset; improvements default to frequency-shift augmentation")
+    parser.add_argument("--augmentation", choices=["none", "sr", "frequency_shift"], default=None)
     parser.add_argument("--sr-segments", type=int, default=8)
     parser.add_argument("--sr-ratio", type=int, default=1)
     parser.add_argument("--frequency-probability", type=float, default=0.5)
     parser.add_argument("--frequency-max-hz", type=float, default=0.5)
     args = parser.parse_args()
-    config = copy.deepcopy(load_config(args.config))
+    config = apply_v1_experiment(load_config(args.config), args.experiment)
     for name in ("data_dir", "labels_dir", "output_dir"):
         if getattr(args, name) is not None:
             config["paths"][name] = getattr(args, name)
@@ -454,17 +467,21 @@ def main():
         parser.error("S&R segments and ratio must be positive")
     if not 0 <= args.frequency_probability <= 1 or not 0 <= args.frequency_max_hz < config["data"]["sampling_rate"] / 2:
         parser.error("Invalid frequency-shift parameters")
-    config["augmentation"] = {"method": args.augmentation, "sr_segments": args.sr_segments,
+    augmentation_method = args.augmentation or ("none" if args.experiment == "baseline" else "frequency_shift")
+    config["augmentation"] = {"method": augmentation_method, "sr_segments": args.sr_segments,
         "sr_ratio": args.sr_ratio, "frequency_probability": args.frequency_probability,
         "frequency_max_hz": args.frequency_max_hz}
-    config["experiment"] = {"version": args.run_version, "protocol": args.protocol}
+    config["experiment"] = {"version": args.run_version, "protocol": args.protocol, "variant": args.experiment}
     if args.protocol == "full-session1":
         config["validation"]["enabled"] = False
         config["training"].update({"early_stopping": False, "selection_metric": "test_accuracy"})
         if args.output_dir is None:
-            config["paths"]["output_dir"] = f"output/{args.run_version}_full_session1_seed42"
-            if args.augmentation != "none":
-                config["paths"]["output_dir"] += "_" + args.augmentation
+            run_name = "full_session1" if args.experiment == "baseline" else args.experiment
+            selected_seeds = args.seeds if args.seeds is not None else config["training"]["seeds"]
+            seed_name = "_".join(str(seed) for seed in selected_seeds)
+            config["paths"]["output_dir"] = f"output/{args.run_version}_{run_name}_seed{seed_name}"
+            if augmentation_method != "none":
+                config["paths"]["output_dir"] += "_" + augmentation_method
     subjects = args.subjects or config["training"]["subjects"]
     if subjects == ["all"]:
         subjects = list(range(1, 10))

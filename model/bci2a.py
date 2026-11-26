@@ -5,6 +5,7 @@ configurable provisional choice because the original PSCA figure and exact
 weight-network dimensions were not supplied. Product-Sum is exactly U * A + A.
 """
 
+import copy
 from dataclasses import dataclass
 import importlib.util
 import math
@@ -14,6 +15,35 @@ from typing import Mapping, Optional, Sequence
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
+
+
+V1_EXPERIMENTS = ("baseline", "regularized", "lightweight", "groupnorm")
+
+
+def apply_v1_experiment(config: Mapping, name: str = "baseline") -> dict:
+    """Resolve an independent v1 preset without mutating the base configuration."""
+    if name not in V1_EXPERIMENTS:
+        raise ValueError(f"Unknown v1 experiment {name!r}. Choose from {V1_EXPERIMENTS}.")
+    resolved = copy.deepcopy(config)
+    model = resolved["model"]
+    if name == "regularized":
+        resolved["training"].update(weight_decay=1e-3, label_smoothing=0.1)
+        model["dropout"] = 0.4
+        model["spatial"]["gat_attention_dropout"] = 0.4
+        model["fusion"]["dropout"] = 0.4
+        model["classifier"]["dropout"] = 0.4
+    elif name == "lightweight":
+        model["d_model"] = 32
+        model["temporal_transformer"]["layers"] = 1
+        model["region_transformer"]["layers"] = 1
+        for section in ("temporal_transformer", "region_transformer", "cross_attention"):
+            model[section]["dim_feedforward"] = 64
+        model["spatial"].update(encoder_channels=[16, 32], gat_layers=1)
+        model["classifier"]["hidden_dim"] = 32
+    elif name == "groupnorm":
+        model["spatial"].update(encoder_normalization="groupnorm", encoder_norm_groups=8)
+    resolved.setdefault("experiment", {})["variant"] = name
+    return resolved
 
 
 class SincFilterBank(nn.Module):
@@ -306,12 +336,21 @@ class SharedElectrodeEncoder(nn.Module):
             raise ValueError("Electrode encoder layer lists must have matching nonzero lengths.")
         if channels[-1] != d_model:
             raise ValueError("Last electrode encoder channel count must equal d_model.")
+        normalization = config.get("encoder_normalization", "batchnorm")
+        groups = config.get("encoder_norm_groups", 8)
+        if normalization not in {"batchnorm", "groupnorm"}:
+            raise ValueError("Electrode encoder normalization must be batchnorm or groupnorm.")
+        if normalization == "groupnorm" and (
+                not isinstance(groups, int) or groups < 1 or any(size % groups for size in channels)):
+            raise ValueError("GroupNorm groups must be positive and divide every encoder channel count.")
         layers = []
         input_channels = 1
         for output_channels, kernel, stride, padding in zip(channels, kernels, strides, paddings):
+            norm = (nn.BatchNorm1d(output_channels) if normalization == "batchnorm"
+                    else nn.GroupNorm(groups, output_channels))
             layers.extend((
                 nn.Conv1d(input_channels, output_channels, kernel, stride=stride, padding=padding),
-                nn.BatchNorm1d(output_channels), nn.GELU(),
+                norm, nn.GELU(),
             ))
             input_channels = output_channels
         layers.append(nn.AdaptiveAvgPool1d(1))
@@ -564,6 +603,9 @@ class DualBranchMINet(nn.Module):
         model_config = config["model"]
         d_model = model_config["d_model"]
         dropout = model_config["dropout"]
+        self.label_smoothing = float(config.get("training", {}).get("label_smoothing", 0.0))
+        if not 0 <= self.label_smoothing < 1:
+            raise ValueError("Training label_smoothing must be in [0, 1).")
         self.n_channels = data_config["n_channels"]
         self.target_samples = round((data_config["epoch_end_sec"] - data_config["epoch_start_sec"]) * data_config["sampling_rate"])
         if len(data_config["channel_names"]) != self.n_channels or len(set(data_config["channel_names"])) != self.n_channels:

@@ -31,6 +31,9 @@ def evaluate_checkpoint(checkpoint_path, data_dir=None, labels_dir=None, device_
         model, loader, device, n_classes=int(config["model"]["num_classes"]),
     )
     result = {
+        "version": checkpoint.get("version", config.get("experiment", {}).get("version", "v1")),
+        "experiment_variant": config.get("experiment", {}).get("variant", "baseline"),
+        "augmentation": config.get("augmentation", {"method": "none"}),
         "subject": checkpoint["subject"], "seed": checkpoint["seed"],
         "best_epoch": checkpoint["best_epoch"], **metrics,
         "session_2_dropped_trials": epochs.dropped_trials,

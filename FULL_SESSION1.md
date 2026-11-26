@@ -1,5 +1,7 @@
 # Session 1 全量训练与最高测试 Acc 选模
 
+新增的三个 v1 改进实验统一保留频移增强，使用 `run_v1_experiments.py` 串行执行。完整实验清单与命令见 [v1 实验记录](docs/v1_experiments.md)。
+
 统一使用主入口 `train_2a.py`，默认协议为 `--protocol full-session1`。使用 Session 1 全部保留试次拟合归一化统计量并训练。每轮训练后对 Session 2 执行 eval 前向，执行完指定 epoch 数后报告最高测试 Accuracy。相同最高值出现多次时取最早轮次。
 
 此实验使用测试集选择模型，报告口径为“200 轮中的最高测试 Acc”。论文和实验对比需明确该口径，存在测试集选模带来的乐观偏差。
