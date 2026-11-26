@@ -122,16 +122,18 @@ loss.backward()
 
 ## 训练、评估和结果
 
+当前 `train_2a.py` 默认采用 Session 1 全量训练、每轮测试 Session 2、执行全部指定 epoch，并按最高测试 Acc 保存模型。`--protocol validation` 可运行下文记录的 v1 验证集选模协议。当前增强方式、GPU 3 命令及批量设置见 [全量训练说明](FULL_SESSION1.md)。
+
 配置数据目录后，使用以下命令训练单被试、单随机种子。
 
 ```powershell
-python train_2a.py --config config/bci2a.yaml --subjects 1 --seeds 42
+python train_2a.py --protocol validation --config config/bci2a.yaml --subjects 1 --seeds 42
 ```
 
 首轮固定随机种子 42。九名被试共 9 次独立训练使用单独的输出目录。
 
 ```powershell
-python train_2a.py --subjects all --seeds 42 --output-dir output/v1_all
+python train_2a.py --protocol validation --subjects all --seeds 42 --output-dir output/v1_all
 ```
 
 省略 `--subjects` 和 `--seeds` 时采用 YAML 中的列表。命令行也支持 `--data-dir`、`--labels-dir`、`--device cpu` 或 `--device cuda`。默认 `device=cuda`，用于安装 CUDA 版 PyTorch 的 Linux 服务器。训练按验证交叉熵最小值保存最佳模型，超过 `patience` 个 epoch 无改善时早停。

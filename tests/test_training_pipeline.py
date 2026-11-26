@@ -54,7 +54,7 @@ class TrainingPipelineTests(unittest.TestCase):
                     self.assertTrue(checkpoint_path.is_file(), "Session 2 read before model selection")
                 return sessions[session]
 
-            arguments = ["train_2a.py", "--config", str(config_path), "--subjects", "1", "--seeds", "42"]
+            arguments = ["train_2a.py", "--protocol", "validation", "--config", str(config_path), "--subjects", "1", "--seeds", "42"]
             with patch("train_2a.read_session", side_effect=read_synthetic), \
                     patch("sys.argv", arguments), contextlib.redirect_stdout(io.StringIO()):
                 train_2a.main()
